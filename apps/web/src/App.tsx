@@ -1,48 +1,44 @@
-import { useEffect, useState } from "react";
 
-type HealthResponse = {
-  status: string;
-  message: string;
-};
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
 
-function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
+import LoginPage from "./features/auth/pages/LoginPage";
+import RegisterPage from "./features/auth/pages/RegisterPage";
+import {DashboardPage} from "./features/tasks/pages/DashboardPage";
 
-  useEffect(() => {
-    async function checkApi() {
-      const response = await fetch("/api/health");
+import GuestRoute from "./routes/GuestRoute";
+import ProtectedRoute from "./routes/ProtectedRoute";
 
-      const data: HealthResponse = await response.json();
-
-      setHealth(data);
-    }
-
-    checkApi();
-  }, []);
-
+export default function App() {
   return (
-    <main className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="rounded-lg bg-white p-8 shadow">
-        <h1 className="text-3xl font-bold text-gray-900">
-          TaskFlow
-        </h1>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
 
-        <p className="mt-2 text-gray-600">
-          Full-stack TypeScript application
-        </p>
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/dashboard"
+            element={<DashboardPage />}
+          />
+        </Route>
 
-        <div className="mt-6 rounded-md bg-gray-50 p-4">
-          <p className="text-sm text-gray-500">
-            API status
-          </p>
+        <Route
+          path="/"
+          element={<Navigate to="/dashboard" replace />}
+        />
 
-          <p className="mt-1 font-medium text-gray-900">
-            {health?.message ?? "Checking API..."}
-          </p>
-        </div>
-      </div>
-    </main>
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;

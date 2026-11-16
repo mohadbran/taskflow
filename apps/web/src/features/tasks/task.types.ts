@@ -1,0 +1,28 @@
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskInput {
+  title: string;
+  description?: string;
+}
+
+export interface UpdateTaskInput {
+  title?: string;
+  description?: string | null;
+  completed?: boolean;
+}
+
+export interface TaskResponse {
+  data: Task;
+}
+
+export interface TasksResponse {
+  data: Task[];
+}
