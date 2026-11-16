@@ -1,13 +1,14 @@
 # TaskFlow — Project Context & Handoff
 
-**Last updated:** 2026-11-14  
-**Purpose:** Preserve the current project architecture, implementation progress, conventions, and next steps so development can continue in a new ChatGPT conversation without repeating decisions.
+**Last updated:** 2026-11-16
+
+**Purpose:** Describe the implementation currently present in the repository, its conventions, verification status, and practical next steps for continuing development.
 
 ---
 
 ## 1. Project Overview
 
-TaskFlow is a hands-on learning project for building a basic full-stack application using modern TypeScript tooling and industry-oriented practices.
+TaskFlow is a hands-on learning project for building a full-stack task management application using modern TypeScript tooling and industry-oriented practices. The repository currently contains an Express API and a React UI for authentication and personal task management.
 
 ### Technology stack
 
@@ -19,9 +20,10 @@ TaskFlow is a hands-on learning project for building a basic full-stack applicat
 - **Password hashing:** Argon2id (`argon2`)
 - **Authentication:** Server-side sessions stored in SQLite; opaque session ID in an HttpOnly cookie
 - **Frontend:** React, Vite, TypeScript
+- **Frontend routing/forms:** React Router, React Hook Form, Zod resolver
 - **Styling:** Tailwind CSS
 
-The project is intended to include authentication and basic CRUD. The user prefers a **step-by-step, hands-on curriculum**, beginner-friendly explanations, sound architecture, and complete files with paths and application instructions.
+The user prefers a **step-by-step, hands-on curriculum**, beginner-friendly explanations, sound architecture, and complete files with paths and application instructions.
 
 ---
 
@@ -40,14 +42,37 @@ taskflow/
 ├── apps/
 │   ├── api/
 │   │   ├── src/
-│   │   ├── drizzle/
+│   │   │   ├── config/          # API environment defaults
+│   │   │   ├── controllers/     # Health endpoint controller
+│   │   │   ├── db/              # Drizzle connection, schemas, seed, relations
+│   │   │   ├── lib/             # App errors, request user, session cookie
+│   │   │   ├── middleware/      # Auth/session and error handling
+│   │   │   ├── modules/
+│   │   │   │   ├── auth/        # Register/login/logout/me
+│   │   │   │   └── tasks/       # Task CRUD API
+│   │   │   ├── routes/
+│   │   │   ├── services/        # Health service
+│   │   │   ├── app.ts
+│   │   │   └── server.ts
+│   │   ├── drizzle/             # Committed SQL migration(s)
 │   │   ├── drizzle.config.ts
-│   │   ├── taskflow.db          # local DB; gitignored
+│   │   ├── taskflow.db          # local DB when created; gitignored
 │   │   └── package.json
 │   └── web/
-│       └── ...                   # React + Vite + Tailwind
+│       ├── src/
+│       │   ├── api/             # Shared fetch client
+│       │   ├── context/         # Auth context/provider
+│       │   ├── features/
+│       │   │   ├── auth/        # Auth API, forms, pages, schemas
+│       │   │   └── tasks/       # Task API, forms, list, dashboard
+│       │   ├── routes/          # Guest and protected route guards
+│       │   ├── App.tsx
+│       │   └── main.tsx
+│       └── package.json
 ├── package.json
 ├── pnpm-workspace.yaml
+├── pnpm-lock.yaml
+├── taskflow-project-context.md
 └── ...
 ```
 
@@ -59,12 +84,14 @@ pnpm typecheck
 pnpm build
 ```
 
-The root typecheck script runs workspace typechecks recursively:
+The root typecheck script invokes workspace typechecks recursively:
 
 ```text
 pnpm typecheck
   └── pnpm --recursive typecheck
 ```
+
+At present, only `apps/api` defines a `typecheck` script. The web app's `build` script runs `tsc -b` before Vite, so `pnpm build` typechecks and builds both workspaces. There is no root lint or test script.
 
 ---
 
@@ -76,10 +103,10 @@ pnpm typecheck
 | Phase 2 | Express backend architecture | Completed |
 | Phase 3 | SQLite + Drizzle foundation | Completed |
 | Phase 4 | Task CRUD API | Implemented |
-| Phase 5 | Backend authentication | Implemented; typecheck issue fixed |
-| Phase 6 | React authentication UI | Not started |
+| Phase 5 | Backend session authentication | Implemented |
+| Phase 6 | React authentication UI and task dashboard | Implemented: auth, create/list/edit/complete tasks |
 
-**Current point:** Backend authentication implementation is in place and the cookie package import/typecheck issue was fixed. Next, verify authentication behavior end-to-end, then proceed to Phase 6 frontend authentication.
+**Current point:** The repository contains the full basic flow from registration/login through authenticated task management. Runtime behavior and automated tests still need verification; see [Known State and Verification](#11-known-state-and-verification) for specific gaps.
 
 ---
 
@@ -92,7 +119,7 @@ Established:
 - `apps/web` for React + Vite + TypeScript + Tailwind
 - Backend on port `4000`
 - Frontend on port `5173`
-- Frontend calls the backend health endpoint
+- Frontend now uses the API for authentication and task management; the health endpoint remains available for API checks.
 
 ---
 
@@ -798,83 +825,75 @@ Keep these decisions unless implementation evidence shows a real need to change 
 
 ## 11. Known State and Verification
 
-### Confirmed
+### Implemented in the repository
 
-- Phases 1–3 were completed.
-- Task CRUD was implemented in Phase 4.
-- Backend authentication was implemented in Phase 5.
-- The `cookie` v2 import/API mismatch was corrected.
-- The user reported that the typecheck worked after the cookie fix.
+- Phases 1–5 are present: workspace setup, API architecture, SQLite/Drizzle, task API, and server-side session authentication.
+- The web app has login and registration pages. React Hook Form and Zod provide client-side validation; registration also checks matching passwords.
+- `AuthProvider` calls `/auth/me` on startup, stores the current user, and exposes login/register/logout actions.
+- `GuestRoute` and `ProtectedRoute` gate auth pages and `/dashboard`, showing a loading state during session initialization.
+- The shared web API client uses `credentials: "include"` for requests and turns non-2xx responses into `ApiError`.
+- The dashboard loads the current user's tasks, displays a completion count, and supports create, edit, toggle-completed, refresh, and logout actions.
+- The API additionally supports task deletion and list filtering/pagination. The current dashboard does not expose a delete action and uses the API's default list parameters.
+- Registration/login API endpoints set the HttpOnly session cookie; `/auth/me` and logout are protected by session middleware. Tasks are protected and scoped to the current user.
 
-### Still worth verifying end-to-end
+### Verification status and follow-up
 
-- Register a new user.
-- Confirm the response sets `taskflow_session`.
-- Call `/api/auth/me` with the cookie.
-- Create/list/update/delete tasks while authenticated.
-- Confirm task ownership across two users.
-- Confirm logout removes the session and clears the cookie.
-- Confirm task requests after logout return 401.
-- Confirm expired sessions are rejected.
-- Confirm the frontend sends credentials.
-
-Do not claim all runtime tests passed solely because typecheck passed.
+- No test files were found under `apps/`, and neither workspace package currently defines a test script.
+- This context refresh inspected implementation and package scripts; it did not run the application or verify browser/API flows.
+- Exercise registration, login, session restore after refresh, logout, task create/list/edit/toggle, API deletion, ownership isolation, and expired-session handling before treating runtime behavior as verified.
+- The web `Task` type declares `id: string`, while the API/database task ID is numeric. Align the frontend type with the actual response (or deliberately normalize the API representation) before relying on ID typing.
+- Add a task deletion control if deletion is intended to be part of the current UI; the API client already exports `deleteTask`.
+- Root `pnpm typecheck` runs scripts available in workspaces; currently that is the API typecheck. `pnpm build` also typechecks the web app as part of its build.
 
 ---
 
-## 12. Next Phase — Phase 6: React Authentication UI
+## 12. Current Frontend Implementation
 
-The planned next phase is:
-
-### Frontend features
-
-- Login page
-- Registration page
-- Authentication API client
-- Auth context/provider
-- Current-user initialization on app startup
-- Protected React routes
-- Logout button
-- Persistent login across refreshes using the server-side session cookie
-- Redirect unauthenticated users to login
-- Display authenticated user's name
-- Loading and error states
-
-### Suggested frontend organization
-
-Adapt to the existing `apps/web` structure without unnecessarily changing Phase 1 files:
+The actual frontend layout is feature-oriented:
 
 ```text
 apps/web/src/
-├── api/
-│   ├── client.ts
-│   └── auth.api.ts
-├── components/
-│   └── ...
+├── api/client.ts
+├── context/AuthContext.tsx
 ├── features/
-│   └── auth/
-│       ├── components/
-│       ├── pages/
-│       │   ├── LoginPage.tsx
-│       │   └── RegisterPage.tsx
-│       └── ...
-├── context/
-│   └── AuthContext.tsx
-├── routes/
-│   └── ...
+│   ├── auth/
+│   │   ├── components/LoginForm.tsx
+│   │   ├── components/RegisterForm.tsx
+│   │   ├── pages/LoginPage.tsx
+│   │   ├── pages/RegisterPage.tsx
+│   │   ├── schemas/auth.schema.ts
+│   │   ├── auth.api.ts
+│   │   └── auth.types.ts
+│   └── tasks/
+│       ├── components/CreateTaskForm.tsx
+│       ├── components/EditTaskForm.tsx
+│       ├── components/TaskItem.tsx
+│       ├── components/TaskList.tsx
+│       ├── pages/DashboardPage.tsx
+│       ├── schemas/task.schema.ts
+│       ├── task.api.ts
+│       └── task.types.ts
+├── routes/GuestRoute.tsx
+├── routes/ProtectedRoute.tsx
 ├── App.tsx
 └── main.tsx
 ```
 
-The frontend must use `credentials: "include"` for requests that use session cookies.
+`App.tsx` maps `/login`, `/register`, and `/dashboard`; `/` redirects to the dashboard and unknown paths redirect to `/`. The dashboard is under `ProtectedRoute`, while auth pages use `GuestRoute`. Both route guards depend on the auth provider's startup `/auth/me` request.
+
+`apps/web/src/api/client.ts` reads `VITE_API_URL`, defaulting to `http://localhost:4000/api`, sends cookies with every API request, and parses the API's `{ data }` / `{ error }` envelopes. The API CORS origin is configured with `CLIENT_URL` (default `http://localhost:5173`).
+
+The task page currently implements the main day-to-day flow, but not every backend operation. Keep the known UI/API gaps in Section 11 in mind before extending the interface.
 
 ---
 
 ## 13. How to Continue in a New Chat
 
-Start the next conversation by attaching or pasting this document and saying:
+Start the next conversation by attaching or pasting this document and asking to continue from the code that is already present. For example:
 
-> Continue my TaskFlow learning project from this context. We have completed Phases 1–5: monorepo, Express backend architecture, SQLite + Drizzle, task CRUD, and backend session authentication. The cookie v2 API/typecheck issue is fixed. Continue with Phase 6 — React Authentication UI. Preserve the existing architecture and conventions; don't redesign the project. Give complete files with paths and implementation instructions, explain important concepts, and proceed step by step.
+> Continue my TaskFlow project from the current repository and this context. The API, server-side authentication, React login/register flow, protected routes, and task dashboard are already implemented. First help verify the existing flows and address the documented frontend task ID mismatch; do not recreate Phase 6 or redesign the architecture. Then recommend the next small step and explain it in a beginner-friendly, hands-on way.
+
+Do not restart the Phase 6 implementation from scratch: the React auth UI and task dashboard are already in the repository. First reconcile the frontend task ID type with the API response, add or plan tests, and verify the flows listed in Section 11. Then choose the next feature with the user.
 
 ---
 
@@ -888,13 +907,21 @@ pnpm typecheck
 pnpm build
 ```
 
+`pnpm typecheck` currently covers the API workspace only. `pnpm build` compiles the API and runs the web TypeScript build plus Vite production build.
+
+### Web
+
+```bash
+pnpm --filter web build
+pnpm --filter web lint
+```
+
 ### API
 
 ```bash
-cd apps/api
-pnpm dev
-pnpm typecheck
-pnpm db:seed
+pnpm --filter @taskflow/api dev
+pnpm --filter @taskflow/api typecheck
+pnpm --filter @taskflow/api db:seed
 ```
 
 ### API endpoints
